@@ -125,9 +125,7 @@ class TestZ21Station:
         # Create packet with LAN_XBUS_HEADER but X-BUS header in data
         # XBusMessage format: [x_header][data_bytes...][xor_checksum]
         # x_header=0x61, dbs=b"\x01", xor=0x61^0x01=0x60
-        packet = Packet(
-            header=LAN_XBUS_HEADER, data=b"\x61\x01\x60"
-        )
+        packet = Packet(header=LAN_XBUS_HEADER, data=b"\x61\x01\x60")
         station._handle_packet(packet)
 
         # Should route to xbus_header (0x61), not LAN_XBUS_HEADER
@@ -196,10 +194,7 @@ class TestZ21Station:
         # Prepare response: X-Header=0xF3, DB0=0x0A, DB1=0x01, DB2=0x30
         # XOR = 0xF3 ^ 0x0A ^ 0x01 ^ 0x30 = 0xC8
         queue = asyncio.Queue()
-        response = Packet(
-            header=LAN_XBUS_HEADER,
-            data=b"\xf3\x0a\x01\x30\xc8"
-        )
+        response = Packet(header=LAN_XBUS_HEADER, data=b"\xf3\x0a\x01\x30\xc8")
         await queue.put(response)
         station._packet_waiters[XBUS_GET_FIRMWARE_VERSION_REPLY] = queue
 
@@ -218,10 +213,7 @@ class TestZ21Station:
         # Prepare response: X-Header=0x63, DB0=0x21, DB1=0x36 (v3.6), DB2=0x12 (CS ID)
         # XOR = 0x63 ^ 0x21 ^ 0x36 ^ 0x12 = 0x66
         queue = asyncio.Queue()
-        response = Packet(
-            header=LAN_XBUS_HEADER,
-            data=b"\x63\x21\x36\x12\x66"
-        )
+        response = Packet(header=LAN_XBUS_HEADER, data=b"\x63\x21\x36\x12\x66")
         await queue.put(response)
         station._packet_waiters[XBUS_GET_VERSION_REPLY] = queue
 
@@ -381,17 +373,28 @@ class TestZ21StationRailCom:
     async def test_get_railcom_data_specific_address(self, station):
         """Test polling RailCom data for specific address."""
         queue = asyncio.Queue()
-        railcom_bytes = bytes([
-            0x03, 0x00,              # Address = 3
-            0x64, 0x00, 0x00, 0x00,  # ReceiveCounter = 100
-            0x02, 0x00,              # ErrorCounter = 2
-            0x00, 0x05, 0x40, 0xC8, 0x00,
-        ])
+        railcom_bytes = bytes(
+            [
+                0x03,
+                0x00,  # Address = 3
+                0x64,
+                0x00,
+                0x00,
+                0x00,  # ReceiveCounter = 100
+                0x02,
+                0x00,  # ErrorCounter = 2
+                0x00,
+                0x05,
+                0x40,
+                0xC8,
+                0x00,
+            ]
+        )
         response = Packet(header=LAN_RAILCOM_GETDATA, data=railcom_bytes)
         await queue.put(response)
-        station._packet_waiters[LAN_RAILCOM_GETDATA] = queue
+        station._packet_waiters[LAN_RAILCOM_DATACHANGED] = queue
 
-        data = await station.get_railcom_data(address=3)
+        data = await station.get_railcom_data(address=3, timeout=0.1)
 
         assert data.loco_address == 3
         assert data.receive_counter == 100
@@ -408,9 +411,9 @@ class TestZ21StationRailCom:
         railcom_bytes = bytes([0] * 13)
         response = Packet(header=LAN_RAILCOM_GETDATA, data=railcom_bytes)
         await queue.put(response)
-        station._packet_waiters[LAN_RAILCOM_GETDATA] = queue
+        station._packet_waiters[LAN_RAILCOM_DATACHANGED] = queue
 
-        await station.get_railcom_data(address=None)
+        await station.get_railcom_data(address=None, timeout=0.1)
 
         # Verify request format
         sent_data = station._transport.sendto.call_args[0][0]
@@ -422,12 +425,23 @@ class TestZ21StationRailCom:
         callback = MagicMock()
         station.subscribe_railcom(callback)
 
-        railcom_bytes = bytes([
-            0x03, 0x00,              # Address = 3
-            0x00, 0x00, 0x00, 0x00,  # ReceiveCounter
-            0x00, 0x00,              # ErrorCounter
-            0x00, 0x00, 0x00, 0x00, 0x00,
-        ])
+        railcom_bytes = bytes(
+            [
+                0x03,
+                0x00,  # Address = 3
+                0x00,
+                0x00,
+                0x00,
+                0x00,  # ReceiveCounter
+                0x00,
+                0x00,  # ErrorCounter
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+            ]
+        )
         packet = Packet(header=LAN_RAILCOM_DATACHANGED, data=railcom_bytes)
         station._handle_packet(packet)
 
