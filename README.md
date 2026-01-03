@@ -32,7 +32,7 @@ Or install from source:
 
 ```bash
 git clone https://github.com/botmonster/z21aio.git
-cd z21-dcc
+cd z21aio
 pip install -e .
 ```
 
