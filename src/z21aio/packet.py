@@ -102,7 +102,7 @@ class Packet:
             return (
                 f"Packet(header=0x{self.header:04X} [{header_name}], "
                 f"x_header=0x{x_header:02X} [{x_header_name}], "
-                f"data={self.data.hex(" ")})"
+                f'data={self.data.hex(" ")})'
             )
 
-        return f"Packet(header=0x{self.header:04X} [{header_name}], data={self.data.hex(" ")})"
+        return f'Packet(header=0x{self.header:04X} [{header_name}], data={self.data.hex(" ")})'
