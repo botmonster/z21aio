@@ -1,9 +1,10 @@
 # z21aio
 
+[![PyPI](https://img.shields.io/pypi/v/z21aio.svg)](https://pypi.org/project/z21aio/)
 [![Tests](https://github.com/botmonster/z21aio/actions/workflows/python-package.yml/badge.svg)](https://github.com/botmonster/z21aio/actions/workflows/python-package.yml)
-[![Documentation Status](https://readthedocs.org/projects/z21aio/badge/?version=latest)](https://z21aio.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/z21aio/badge/?version=stable)](https://z21aio.readthedocs.io/en/stable/?badge=stable)
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/botmonster/z21aio/blob/main/LICENSE)
 
 Async Python library for Z21 DCC command station communication using UDP protocol.
 
@@ -64,20 +65,9 @@ async def main():
 asyncio.run(main())
 ```
 
-## Multi-Station Support
+## Documentation
 
-Connect to multiple Z21 stations simultaneously:
-
-```python
-async def multi_station():
-    async with await Z21Station.connect("192.168.0.111") as station1, \
-               await Z21Station.connect("192.168.0.112") as station2:
-        loco1 = await Loco.control(station1, address=3)
-        loco2 = await Loco.control(station2, address=5)
-
-        await loco1.drive(50.0)
-        await loco2.drive(30.0)
-```
+https://z21aio.readthedocs.io/en/stable/
 
 ## API Reference
 

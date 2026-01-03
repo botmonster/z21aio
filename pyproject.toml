@@ -28,6 +28,7 @@ docs = ["sphinx>=7.0", "sphinx-rtd-theme>=2.0"]
 [project.urls]
 Homepage = "https://github.com/botmonster/z21aio"
 Repository = "https://github.com/botmonster/z21aio"
+Documentation = "https://z21aio.readthedocs.io/"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
