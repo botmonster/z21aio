@@ -11,6 +11,7 @@ import struct
 
 class DccThrottleSteps(IntEnum):
     """DCC throttle step modes."""
+
     STEPS_14 = 0
     STEPS_28 = 2
     STEPS_128 = 4
@@ -52,6 +53,7 @@ class DccThrottleSteps(IntEnum):
 
 class FunctionAction(IntEnum):
     """Action to perform on a locomotive function."""
+
     OFF = 0
     ON = 1
     TOGGLE = 2
@@ -65,16 +67,17 @@ class SystemState:
     Contains information about the command station's current state
     including current, voltage, and temperature readings.
     """
-    main_current: int           # Main track current in mA
-    prog_current: int           # Programming track current in mA
+
+    main_current: int  # Main track current in mA
+    prog_current: int  # Programming track current in mA
     filtered_main_current: int  # Smoothed main current in mA
-    temperature: int            # Internal temperature in C
-    supply_voltage: int         # Supply voltage in mV
-    vcc_voltage: int            # VCC/track voltage in mV
-    central_state: int          # Central state bitmask
-    central_state_ex: int       # Extended central state bitmask
-    reserved: int               # Reserved byte
-    capabilities: int           # Capabilities bitmask (FW 1.42+)
+    temperature: int  # Internal temperature in C
+    supply_voltage: int  # Supply voltage in mV
+    vcc_voltage: int  # VCC/track voltage in mV
+    central_state: int  # Central state bitmask
+    central_state_ex: int  # Extended central state bitmask
+    reserved: int  # Reserved byte
+    capabilities: int  # Capabilities bitmask (FW 1.42+)
 
     @classmethod
     def from_bytes(cls, data: bytes) -> "SystemState":
@@ -143,6 +146,7 @@ class LocoState:
     Contains information about a locomotive's current state including
     speed, direction, and function states.
     """
+
     address: int
     is_busy: bool | None = None
     stepping: DccThrottleSteps | None = None
@@ -232,10 +236,11 @@ class LocoState:
 
 class RailComOptions(IntFlag):
     """RailCom option flags from the Options byte."""
+
     NONE = 0x00
     SPEED1 = 0x01  # Speed 1 data available
     SPEED2 = 0x02  # Speed 2 data available
-    QOS = 0x04     # Quality of Service data valid
+    QOS = 0x04  # Quality of Service data valid
 
 
 @dataclass
@@ -254,6 +259,7 @@ class RailComData:
         speed: Current speed value (interpretation depends on options)
         qos: Quality of Service value (0-255, higher is better)
     """
+
     loco_address: int
     receive_counter: int
     error_counter: int

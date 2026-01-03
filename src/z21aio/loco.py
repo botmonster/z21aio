@@ -12,7 +12,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from .messages import (
-    LAN_XBUS_HEADER,
     XBUS_LOCO_INFO,
     XBusMessage,
 )
@@ -307,6 +306,7 @@ class Loco:
         Note:
             Requires enabling RailCom broadcasts on the station first.
         """
+
         def handle_railcom(railcom_data: RailComData) -> None:
             self._railcom = railcom_data
             if callback is not None:

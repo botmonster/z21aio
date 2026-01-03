@@ -13,8 +13,6 @@ import struct
 from collections.abc import Callable
 from typing import Any
 
-log = logging.getLogger(__name__)
-
 from .packet import Packet
 from .messages import (
     LAN_DISCOVER_DEVICES,
@@ -26,7 +24,6 @@ from .messages import (
     LAN_SYSTEMSTATE_GETDATA,
     LAN_RAILCOM_DATACHANGED,
     LAN_RAILCOM_GETDATA,
-    XBUS_BC_TRACK_POWER,
     XBUS_GET_VERSION_REPLY,
     XBUS_GET_FIRMWARE_VERSION_REPLY,
     BROADCAST_LOCO_INFO,
@@ -36,6 +33,7 @@ from .messages import (
 )
 from .types import SystemState, RailComData
 
+log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 21105
 DEFAULT_TIMEOUT = 2.0
