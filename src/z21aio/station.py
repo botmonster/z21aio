@@ -54,12 +54,22 @@ class Z21Protocol(asyncio.DatagramProtocol):
         self._transport = transport
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
-        try:
-            packet = Packet.from_bytes(data)
-            log.debug("datagram_received: %d bytes from %s %s", len(data), addr, packet)
-            self._station._handle_packet(packet)
-        except Exception as e:
-            log.error("Failed to parse packet from %s: %s <%s>", addr, e, data.hex(" "))
+        offset = 0
+        while offset < len(data):
+            try:
+                packet = Packet.from_bytes(data[offset:])
+                log.debug("datagram_received: %d bytes from %s %s", len(data), addr, packet)
+                self._station._handle_packet(packet)
+                offset += packet.data_len
+            except Exception as e:
+                log.error(
+                    "Failed to parse packet from %s at offset %d: %s <%s>",
+                    addr,
+                    offset,
+                    e,
+                    data[offset:].hex(" "),
+                )
+                break
 
     def error_received(self, exc: Exception) -> None:
         log.error("Protocol error: %s", exc)

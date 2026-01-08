@@ -47,6 +47,62 @@ class TestZ21Protocol:
         # Should not raise
         protocol.datagram_received(b"\x00", ("192.168.0.111", 21105))
 
+    def test_datagram_received_multiple_packets(self):
+        """Test receiving multiple Z21 packets in single UDP datagram."""
+        station = MagicMock()
+        station._handle_packet = MagicMock()
+        protocol = Z21Protocol(station)
+
+        # Packet 1: LAN_GET_SERIAL_NUMBER (header=0x10), empty data
+        packet1 = b"\x04\x00\x10\x00"
+        # Packet 2: LAN_XBUS_HEADER (header=0x40) with track power broadcast
+        packet2 = b"\x07\x00\x40\x00\x61\x01\x60"
+
+        datagram = packet1 + packet2
+        protocol.datagram_received(datagram, ("192.168.0.111", 21105))
+
+        assert station._handle_packet.call_count == 2
+
+        first = station._handle_packet.call_args_list[0][0][0]
+        assert first.header == 0x10
+        assert first.data == b""
+
+        second = station._handle_packet.call_args_list[1][0][0]
+        assert second.header == 0x40
+        assert second.data == b"\x61\x01\x60"
+
+    def test_datagram_received_three_packets(self):
+        """Test receiving three packets in single datagram."""
+        station = MagicMock()
+        station._handle_packet = MagicMock()
+        protocol = Z21Protocol(station)
+
+        # Three minimal packets
+        packet1 = b"\x04\x00\x10\x00"
+        packet2 = b"\x04\x00\x30\x00"  # LAN_LOGOFF
+        packet3 = b"\x05\x00\x84\x00\xff"  # LAN_SYSTEMSTATE with 1 byte data
+
+        datagram = packet1 + packet2 + packet3
+        protocol.datagram_received(datagram, ("192.168.0.111", 21105))
+
+        assert station._handle_packet.call_count == 3
+
+    def test_datagram_received_error_in_second_packet(self):
+        """Test that error in second packet logs error and stops parsing."""
+        station = MagicMock()
+        station._handle_packet = MagicMock()
+        protocol = Z21Protocol(station)
+
+        # Valid packet followed by truncated/invalid data
+        packet1 = b"\x04\x00\x10\x00"
+        invalid = b"\x02\x00"  # Too short (claims 2 bytes but needs 4 minimum)
+
+        datagram = packet1 + invalid
+        protocol.datagram_received(datagram, ("192.168.0.111", 21105))
+
+        # First packet should be handled, second should fail
+        assert station._handle_packet.call_count == 1
+
     def test_connection_lost(self):
         """Test connection lost flag."""
         station = MagicMock()
