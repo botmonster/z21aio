@@ -11,7 +11,7 @@ sys.path.insert(0, str(src_path))
 project = "z21aio"
 copyright = "2026, botmonster"
 author = "botmonster"
-release = "1.0.0"
+release = "1.0.1"
 
 # Sphinx extensions
 extensions = [
