@@ -16,9 +16,10 @@ from z21aio.messages import (
     BROADCAST_RAILCOM_ALL,
     XBUS_GET_VERSION_REPLY,
     XBUS_GET_FIRMWARE_VERSION_REPLY,
+    XBUS_LOCO_INFO,
     XBusMessage,
 )
-from z21aio.types import RailComData
+from z21aio.types import RailComData, LocoState
 
 
 class TestZ21Protocol:
@@ -525,3 +526,151 @@ class TestZ21StationRailCom:
 
         callback.assert_called_once()
         assert callback.call_args[0][0].loco_address == 5
+
+
+class TestZ21StationLocoStateSubscription:
+    """Tests for Z21Station loco state subscription functionality."""
+
+    @pytest.fixture
+    def station(self):
+        """Create a Z21Station instance without connecting."""
+        s = Z21Station()
+        s._transport = MagicMock()
+        s._running = True
+        return s
+
+    def test_subscribe_loco_state_single_callback(self, station):
+        """Test subscribing to loco state updates with one callback."""
+        callback = MagicMock()
+        station.subscribe_loco_state(callback)
+
+        # Create XBUS_LOCO_INFO packet for address 3
+        # Format: x_header=0xEF, address_msb, address_lsb, busy_step, speed, f0-f4, f5-f12, checksum
+        # Address 3 = 0x0003, speed 64 (forward 50%), F0=on, rest off
+        # Checksum: 0xEF ^ 0x00 ^ 0x03 ^ 0x00 ^ 0xC0 ^ 0x10 ^ 0x00 = 0x3C
+        xbus_data = b"\xef\x00\x03\x00\xc0\x10\x00\x3c"
+        packet = Packet(header=LAN_XBUS_HEADER, data=xbus_data)
+        station._handle_packet(packet)
+
+        callback.assert_called_once()
+        state = callback.call_args[0][0]
+        assert isinstance(state, LocoState)
+        assert state.address == 3
+
+    def test_subscribe_loco_state_multiple_callbacks(self, station):
+        """Test multiple callbacks receive updates."""
+        callback1 = MagicMock()
+        callback2 = MagicMock()
+        station.subscribe_loco_state(callback1)
+        station.subscribe_loco_state(callback2)
+
+        # Create packet for address 5
+        xbus_data = b"\xef\x00\x05\x00\x80\x00\x00\x6a"
+        packet = Packet(header=LAN_XBUS_HEADER, data=xbus_data)
+        station._handle_packet(packet)
+
+        callback1.assert_called_once()
+        callback2.assert_called_once()
+        assert callback1.call_args[0][0].address == 5
+        assert callback2.call_args[0][0].address == 5
+
+    def test_subscribe_loco_state_multiple_locos(self, station):
+        """Test receiving updates from different locomotives."""
+        received_states = []
+
+        def callback(state: LocoState):
+            received_states.append(state)
+
+        station.subscribe_loco_state(callback)
+
+        # Send packets for addresses 3, 5, 7
+        for addr in [3, 5, 7]:
+            addr_msb = (addr >> 8) & 0xFF
+            addr_lsb = addr & 0xFF
+            # Simple packet with just address
+            checksum = 0xEF ^ addr_msb ^ addr_lsb ^ 0x00 ^ 0x80 ^ 0x00 ^ 0x00
+            xbus_data = bytes([0xEF, addr_msb, addr_lsb, 0x00, 0x80, 0x00, 0x00, checksum])
+            packet = Packet(header=LAN_XBUS_HEADER, data=xbus_data)
+            station._handle_packet(packet)
+
+        assert len(received_states) == 3
+        assert received_states[0].address == 3
+        assert received_states[1].address == 5
+        assert received_states[2].address == 7
+
+    def test_subscribe_loco_state_coexist_with_loco_subscribe(self, station):
+        """Test Station.subscribe_loco_state coexists with Loco.subscribe_state."""
+        # Simulate a Loco.subscribe_state callback that filters by address
+        loco_callback = MagicMock()
+
+        def loco_filter_callback(packet: Packet):
+            xbus_msg = XBusMessage.from_bytes(packet.data)
+            if xbus_msg.x_header == XBUS_LOCO_INFO:
+                state = LocoState.from_bytes(xbus_msg.dbs)
+                if state.address == 3:  # Loco filtering
+                    loco_callback(state)
+
+        # Register Loco-style callback (filters by address 3)
+        if XBUS_LOCO_INFO not in station._subscribers:
+            station._subscribers[XBUS_LOCO_INFO] = []
+        station._subscribers[XBUS_LOCO_INFO].append(loco_filter_callback)
+
+        # Register station-level callback (receives all)
+        station_callback = MagicMock()
+        station.subscribe_loco_state(station_callback)
+
+        # Send packet for address 3
+        xbus_data = b"\xef\x00\x03\x00\x80\x00\x00\x6c"
+        packet = Packet(header=LAN_XBUS_HEADER, data=xbus_data)
+        station._handle_packet(packet)
+
+        # Both callbacks should be called
+        loco_callback.assert_called_once()
+        station_callback.assert_called_once()
+        assert loco_callback.call_args[0][0].address == 3
+        assert station_callback.call_args[0][0].address == 3
+
+        # Send packet for address 5
+        xbus_data = b"\xef\x00\x05\x00\x80\x00\x00\x6a"
+        packet = Packet(header=LAN_XBUS_HEADER, data=xbus_data)
+        station._handle_packet(packet)
+
+        # Loco callback should not be called (filtered out)
+        # Station callback should be called
+        assert loco_callback.call_count == 1  # Still 1
+        assert station_callback.call_count == 2  # Now 2
+
+    def test_subscribe_loco_state_error_handling(self, station):
+        """Test that errors in callback don't crash the handler."""
+        def bad_callback(state: LocoState):
+            raise ValueError("Test error")
+
+        good_callback = MagicMock()
+
+        station.subscribe_loco_state(bad_callback)
+        station.subscribe_loco_state(good_callback)
+
+        # Send valid packet
+        xbus_data = b"\xef\x00\x03\x00\x80\x00\x00\x6c"
+        packet = Packet(header=LAN_XBUS_HEADER, data=xbus_data)
+
+        # Should not raise, and good_callback should still be called
+        station._handle_packet(packet)
+
+        good_callback.assert_called_once()
+
+    def test_subscribe_loco_state_invalid_packet(self, station):
+        """Test that invalid packets don't crash the handler."""
+        callback = MagicMock()
+        station.subscribe_loco_state(callback)
+
+        # Send valid XBUS packet but with wrong x_header (not XBUS_LOCO_INFO)
+        # This will pass XBusMessage validation but won't trigger callback
+        xbus_data = b"\x61\x00\x61"  # Track power message
+        packet = Packet(header=LAN_XBUS_HEADER, data=xbus_data)
+
+        # Should not raise
+        station._handle_packet(packet)
+
+        # Callback should not be called (wrong x_header)
+        callback.assert_not_called()

@@ -31,7 +31,7 @@ from .messages import (
     BROADCAST_RAILCOM_ALL,
     XBusMessage,
 )
-from .types import SystemState, RailComData
+from .types import SystemState, RailComData, LocoState
 
 log = logging.getLogger(__name__)
 
@@ -523,6 +523,43 @@ class Z21Station:
                     await asyncio.sleep(interval)
 
         return asyncio.create_task(poll_loop())
+
+    def subscribe_loco_state(
+        self,
+        callback: Callable[[LocoState], None],
+    ) -> None:
+        """
+        Subscribe to locomotive state updates from all locomotives.
+
+        The callback will be called whenever the station broadcasts
+        a state update for any locomotive. The LocoState object
+        includes the locomotive address, speed, functions, and other state.
+
+        Args:
+            callback: Function called with LocoState for each update.
+                     Receives updates for ALL locomotives.
+
+        Example:
+            def on_any_loco_state(state: LocoState):
+                print(f"Loco {state.address}: speed={state.speed_percentage}%")
+
+            station.subscribe_loco_state(on_any_loco_state)
+        """
+        from .messages import XBUS_LOCO_INFO
+
+        def handle_packet(packet: Packet) -> None:
+            try:
+                xbus_msg = XBusMessage.from_bytes(packet.data)
+                if xbus_msg.x_header == XBUS_LOCO_INFO:
+                    state = LocoState.from_bytes(xbus_msg.dbs)
+                    callback(state)
+            except Exception as e:
+                log.error(f"Error in loco state subscription callback: {e}")
+
+        # Register subscriber for XBUS_LOCO_INFO header
+        if XBUS_LOCO_INFO not in self._subscribers:
+            self._subscribers[XBUS_LOCO_INFO] = []
+        self._subscribers[XBUS_LOCO_INFO].append(handle_packet)
 
     async def close(self) -> None:
         """
