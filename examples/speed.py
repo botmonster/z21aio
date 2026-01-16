@@ -33,7 +33,7 @@ async def main():
         await asyncio.sleep(2)
 
         print("Reverse...")
-        await loco.drive(-50.0)  # 50% reverse
+        await loco.drive(50.0, reverse=True)  # 50% reverse
         await asyncio.sleep(3)
 
         print("Normal stop (with braking)...")

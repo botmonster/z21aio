@@ -26,7 +26,7 @@ class TestCalcSpeedByte:
 
     def test_reverse_50_percent_128_steps(self):
         """Test 50% reverse speed with 128 steps."""
-        result = _calc_speed_byte(DccThrottleSteps.STEPS_128, -50.0)
+        result = _calc_speed_byte(DccThrottleSteps.STEPS_128, 50.0, reverse=True)
 
         # 50% of 128 = 64, without forward bit
         assert result == 64
@@ -60,11 +60,11 @@ class TestCalcSpeedByte:
         assert result == 0xFF
 
     def test_speed_clamping_low(self):
-        """Test that speed under -100% is clamped."""
-        result = _calc_speed_byte(DccThrottleSteps.STEPS_128, -150.0)
+        """Test that negative speed is clamped to 0."""
+        result = _calc_speed_byte(DccThrottleSteps.STEPS_128, -50.0)
 
-        # Should be clamped to -100% = 127 reverse
-        assert result == 127
+        # Negative speed should be clamped to 0, with forward bit
+        assert result == 0x80
 
     def test_small_forward_speed(self):
         """Test small forward speed."""
@@ -75,10 +75,38 @@ class TestCalcSpeedByte:
 
     def test_small_reverse_speed(self):
         """Test small reverse speed."""
-        result = _calc_speed_byte(DccThrottleSteps.STEPS_128, -1.0)
+        result = _calc_speed_byte(DccThrottleSteps.STEPS_128, 1.0, reverse=True)
 
         # 1% of 128 = 1, without forward bit
         assert result == 1
+
+    def test_zero_speed_forward(self):
+        """Test zero speed with forward direction."""
+        result = _calc_speed_byte(DccThrottleSteps.STEPS_128, 0.0, reverse=False)
+
+        # 0% with forward bit
+        assert result == 0x80
+
+    def test_zero_speed_reverse(self):
+        """Test zero speed with reverse direction."""
+        result = _calc_speed_byte(DccThrottleSteps.STEPS_128, 0.0, reverse=True)
+
+        # 0% without forward bit
+        assert result == 0x00
+
+    def test_full_speed_reverse(self):
+        """Test 100% reverse speed."""
+        result = _calc_speed_byte(DccThrottleSteps.STEPS_128, 100.0, reverse=True)
+
+        # 100% of 128 = 127, without forward bit
+        assert result == 127
+
+    def test_direction_28_steps_reverse(self):
+        """Test reverse direction with 28 steps."""
+        result = _calc_speed_byte(DccThrottleSteps.STEPS_28, 50.0, reverse=True)
+
+        # 50% of 28 = 14, without forward bit
+        assert result == 14
 
 
 class TestLoco:
@@ -124,13 +152,37 @@ class TestLoco:
     async def test_drive_reverse(self, mock_station):
         """Test driving in reverse."""
         loco = Loco(mock_station, address=3)
-        await loco.drive(-50.0)
+        await loco.drive(50.0, reverse=True)
 
         mock_station.send_xbus_command.assert_called_once()
         call_args = mock_station.send_xbus_command.call_args
         msg = call_args[0][0]
 
         assert msg.dbs[3] == 64  # 50% reverse (no direction bit)
+
+    @pytest.mark.asyncio
+    async def test_drive_zero_speed_forward(self, mock_station):
+        """Test setting zero speed with forward direction."""
+        loco = Loco(mock_station, address=3)
+        await loco.drive(0.0, reverse=False)
+
+        mock_station.send_xbus_command.assert_called_once()
+        call_args = mock_station.send_xbus_command.call_args
+        msg = call_args[0][0]
+
+        assert msg.dbs[3] == 0x80  # Zero speed with forward direction bit
+
+    @pytest.mark.asyncio
+    async def test_drive_zero_speed_reverse(self, mock_station):
+        """Test setting zero speed with reverse direction."""
+        loco = Loco(mock_station, address=3)
+        await loco.drive(0.0, reverse=True)
+
+        mock_station.send_xbus_command.assert_called_once()
+        call_args = mock_station.send_xbus_command.call_args
+        msg = call_args[0][0]
+
+        assert msg.dbs[3] == 0x00  # Zero speed with reverse direction
 
     @pytest.mark.asyncio
     async def test_stop(self, mock_station):

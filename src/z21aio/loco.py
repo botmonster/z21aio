@@ -23,36 +23,33 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def _calc_speed_byte(steps: DccThrottleSteps, speed_percent: float) -> int:
+def _calc_speed_byte(steps: DccThrottleSteps, speed_percent: float, reverse: bool = False) -> int:
     """
     Calculate speed byte from percentage and throttle steps.
 
     Args:
         steps: Throttle step mode
-        speed_percent: Speed as percentage (-100 to 100, negative = reverse)
+        speed_percent: Speed as percentage (0 to 100)
+        reverse: Direction, False = forward, True = reverse
 
     Returns:
         Speed byte with direction bit (bit 7)
     """
     # Clamp speed to valid range
-    speed_percent = max(-100.0, min(100.0, speed_percent))
-
-    # Calculate direction and absolute speed
-    forward = speed_percent >= 0
-    abs_speed = abs(speed_percent)
+    speed_percent = max(0.0, min(100.0, speed_percent))
 
     # Map percentage to throttle steps
     max_speed = steps.max_speed
-    speed_value = int((abs_speed / 100.0) * max_speed)
+    speed_value = int((speed_percent / 100.0) * max_speed)
 
     # Clamp to valid range (0-127 for step values)
     speed_value = min(speed_value, 127)
 
     # Combine with direction bit
-    if forward:
-        return speed_value | 0x80
-    else:
+    if reverse:
         return speed_value
+    else:
+        return speed_value | 0x80
 
 
 class Loco:
@@ -66,6 +63,7 @@ class Loco:
         loco = await Loco.control(station, address=3)
         await loco.set_headlights(True)
         await loco.drive(50.0)  # 50% forward
+        await loco.drive(50.0, reverse=True)  # 50% reverse
         await loco.stop()
     """
 
@@ -129,15 +127,15 @@ class Loco:
         """Throttle step mode for this locomotive."""
         return self._steps
 
-    async def drive(self, speed_percent: float) -> None:
+    async def drive(self, speed_percent: float, reverse: bool = False) -> None:
         """
         Set locomotive speed and direction.
 
         Args:
-            speed_percent: Speed as percentage (-100 to 100)
-                          Positive = forward, negative = reverse
+            speed_percent: Speed as percentage (0 to 100)
+            reverse: Direction, False = forward, True = reverse
         """
-        speed_byte = _calc_speed_byte(self._steps, speed_percent)
+        speed_byte = _calc_speed_byte(self._steps, speed_percent, reverse)
         msg = XBusMessage.loco_drive(self._address, self._steps, speed_byte)
         await self._station.send_xbus_command(msg)
 
