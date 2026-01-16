@@ -278,7 +278,7 @@ class Z21Station:
 
         return struct.unpack("<I", response.data[:4])[0]
 
-    async def discover_devices(self) -> int:
+    async def discover_devices(self) -> None:
         """
         Get the Z21 station devices.
 
@@ -287,13 +287,6 @@ class Z21Station:
         """
         packet = Packet.with_header(LAN_DISCOVER_DEVICES)
         await self.send_packet(packet)
-
-        # response = await self.receive_packet(LAN_GET_SERIAL_NUMBER)
-
-        # if len(response.data) < 4:
-        #     raise ValueError("Invalid serial number response")
-
-        # return struct.unpack("<I", response.data[:4])[0]
 
     async def get_firmware_version(self) -> tuple[int, int]:
         """
