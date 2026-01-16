@@ -149,6 +149,35 @@ See the `examples/` directory for complete working examples:
 
 This library implements the Z21 LAN Protocol as documented by Roco/Fleischmann.
 
+## Development
+
+### Setup
+
+```bash
+git clone https://github.com/botmonster/z21aio.git
+cd z21aio
+python -m venv .venv
+.venv/Scripts/activate  # Windows
+# source .venv/bin/activate  # Linux/macOS
+pip install -e ".[dev]"
+```
+
+### Enable Pre-commit Hooks
+
+To enable the pre-commit hooks that run flake8 and pytest before each commit:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This ensures code quality checks run locally before pushing to the repository.
+
+### Running Tests
+
+```bash
+pytest tests/ -v
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
