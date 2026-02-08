@@ -11,6 +11,8 @@ from collections.abc import Callable
 import logging
 from typing import TYPE_CHECKING
 
+from z21aio.packet import Packet
+
 from .messages import (
     XBUS_LOCO_INFO,
     XBusMessage,
@@ -35,7 +37,7 @@ def _calc_speed_byte(steps: DccThrottleSteps, speed_percent: float, reverse: boo
     Returns:
         Speed byte with direction bit (bit 7)
     """
-    # Clamp speed to valid range
+# Clamp speed to valid range
     speed_percent = max(0.0, min(100.0, speed_percent))
 
     # Map percentage to throttle steps
@@ -245,7 +247,7 @@ class Loco:
             callback: Function called with LocoState on each update
         """
 
-        def handle_packet(packet: "XBusMessage") -> None:  # type: ignore[name-defined]
+        def handle_packet(packet: Packet) -> None:
             try:
                 xbus_msg = XBusMessage.from_bytes(packet.data)
                 if xbus_msg.x_header == XBUS_LOCO_INFO:
