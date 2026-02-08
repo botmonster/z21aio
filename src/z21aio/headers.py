@@ -200,12 +200,12 @@ X_HEADER_NAMES = {
     0xF3: "LAN_X_GET_FIRMWARE_VERSION_REPLY",
 }
 
+def get_x_header_name(x_header: int) -> str:
+    """Get the name of an X-Header by its hex value."""
+    return X_HEADER_NAMES.get(x_header, f"UNKNOWN_HEADER_0x{x_header:02X}")
 
 def get_header_name(header: int) -> str:
     """Get the name of a LAN header by its hex value."""
-    return HEADER_NAMES.get(header, f"UNKNOWN_HEADER_0x{header:02X}")
+    return HEADER_NAMES.get(header, get_x_header_name(header))
 
 
-def get_x_header_name(x_header: int) -> str:
-    """Get the name of an X-Header by its hex value."""
-    return X_HEADER_NAMES.get(x_header, f"UNKNOWN_X_HEADER_0x{x_header:02X}")

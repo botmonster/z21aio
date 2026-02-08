@@ -13,6 +13,8 @@ import struct
 from collections.abc import Callable
 from typing import Any
 
+from z21aio.headers import get_header_name
+
 from .packet import Packet
 from .messages import (
     LAN_DISCOVER_DEVICES,
@@ -39,7 +41,7 @@ DEFAULT_PORT = 21105
 DEFAULT_TIMEOUT = 2.0
 KEEP_ALIVE_INTERVAL = 20.0
 BUFFER_SIZE = 1024
-
+QUEUE_MAX_SIZE = 10
 
 class Z21Protocol(asyncio.DatagramProtocol):
     """UDP protocol handler for Z21 communication."""
@@ -182,14 +184,17 @@ class Z21Station:
             try:
                 self._packet_waiters[header].put_nowait(packet)
             except asyncio.QueueFull:
-                log.error(f"Queue is full on packet waiters header={header}")
+                log.warning(f"Queue is full on packet waiters header={get_header_name(header)}")
+                self._packet_waiters[header] = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
+                self._packet_waiters[header].put_nowait(packet)
+
 
         if header in self._subscribers:
             for callback in self._subscribers[header]:
                 try:
                     callback(packet)
                 except Exception as e:
-                    log.error(f"Got callback error from subscribed header={header} {e}")
+                    log.error(f"Got callback error from subscribed header={get_header_name(header)} {e}")
 
     async def send_packet(self, packet: Packet) -> None:
         """
@@ -226,7 +231,7 @@ class Z21Station:
             timeout = self._timeout
 
         if header not in self._packet_waiters:
-            self._packet_waiters[header] = asyncio.Queue(maxsize=100)
+            self._packet_waiters[header] = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
 
         queue = self._packet_waiters[header]
 
