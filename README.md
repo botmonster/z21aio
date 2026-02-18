@@ -20,7 +20,7 @@ Async Python library for Z21 DCC command station communication using UDP protoco
 ## Requirements
 
 - Python 3.10+
-- Z21 command station (Roco/Fleischmann)
+- Z21 command station (Roco/Fleischmann/RailBOX)
 
 ## Installation
 
