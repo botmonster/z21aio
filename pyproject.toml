@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "z21aio"
-version = "1.0.1"
+version = "1.0.2"
 description = "Async Python library for Z21 DCC command station communication"
 readme = "README.md"
 license = "MIT"
