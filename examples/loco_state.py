@@ -52,7 +52,14 @@ async def main():
         await loco.drive(60.0)
         await asyncio.sleep(2)
 
+        # Normal stop - decelerates per decoder settings
         await loco.stop()
+        await asyncio.sleep(1)
+
+        # Emergency stop - immediate halt (E-Stop, speed byte 0x01)
+        await loco.drive(30.0)
+        await asyncio.sleep(1)
+        await loco.estop()
         await asyncio.sleep(1)
 
         await loco.set_headlights(False)

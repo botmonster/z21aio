@@ -197,16 +197,16 @@ class TestLoco:
         assert msg.dbs[3] == 0x00  # Stop
 
     @pytest.mark.asyncio
-    async def test_halt(self, mock_station):
+    async def test_estop(self, mock_station):
         """Test emergency stop."""
         loco = Loco(mock_station, address=3)
-        await loco.halt()
+        await loco.estop()
 
         mock_station.send_xbus_command.assert_called_once()
         call_args = mock_station.send_xbus_command.call_args
         msg = call_args[0][0]
 
-        assert msg.dbs[3] == 0x01  # Emergency stop
+        assert msg.dbs[3] == 0x01  # Emergency stop (E-Stop)
 
     @pytest.mark.asyncio
     async def test_function_on(self, mock_station):

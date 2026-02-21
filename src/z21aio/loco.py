@@ -68,7 +68,8 @@ class Loco:
         await loco.set_headlights(True)
         await loco.drive(50.0)  # 50% forward
         await loco.drive(50.0, reverse=True)  # 50% reverse
-        await loco.stop()
+        await loco.stop()   # Normal stop (decelerate)
+        await loco.estop()  # Emergency stop (immediate)
     """
 
     def __init__(
@@ -152,7 +153,7 @@ class Loco:
         msg = XBusMessage.loco_drive(self._address, self._steps, 0x00)
         await self._station.send_xbus_command(msg)
 
-    async def halt(self) -> None:
+    async def estop(self) -> None:
         """
         Emergency stop (immediate halt).
 
