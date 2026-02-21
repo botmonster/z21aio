@@ -8,7 +8,7 @@ version = "1.0.5"
 description = "Async Python library for Z21 DCC command station communication"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "botmonster" }]
 keywords = ["z21", "dcc", "model-railway", "asyncio", "roco", "fleischmann"]
 classifiers = [
