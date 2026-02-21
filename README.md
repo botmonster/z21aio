@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/z21aio.svg)](https://pypi.org/project/z21aio/)
 [![Tests](https://github.com/botmonster/z21aio/actions/workflows/python-package.yml/badge.svg)](https://github.com/botmonster/z21aio/actions/workflows/python-package.yml)
 [![Documentation Status](https://readthedocs.org/projects/z21aio/badge/?version=stable)](https://z21aio.readthedocs.io/en/stable/?badge=stable)
-[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/botmonster/z21aio/blob/main/LICENSE)
 
 Async Python library for Z21 DCC command station communication using UDP protocol.
