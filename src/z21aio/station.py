@@ -43,6 +43,7 @@ KEEP_ALIVE_INTERVAL = 20.0
 BUFFER_SIZE = 1024
 QUEUE_MAX_SIZE = 10
 
+
 class Z21Protocol(asyncio.DatagramProtocol):
     """UDP protocol handler for Z21 communication."""
 
@@ -60,7 +61,9 @@ class Z21Protocol(asyncio.DatagramProtocol):
         while offset < len(data):
             try:
                 packet = Packet.from_bytes(data[offset:])
-                log.debug("datagram_received: %d bytes from %s %s", len(data), addr, packet)
+                log.debug(
+                    "datagram_received: %d bytes from %s %s", len(data), addr, packet
+                )
                 self._station._handle_packet(packet)
                 offset += packet.data_len
             except Exception as e:
@@ -121,6 +124,8 @@ class Z21Station:
         host: str,
         port: int = DEFAULT_PORT,
         timeout: float = DEFAULT_TIMEOUT,
+        *,
+        keep_alive: bool = True,
     ) -> Z21Station:
         """
         Connect to a Z21 station.
@@ -129,7 +134,8 @@ class Z21Station:
             host: IP address of the Z21 station
             port: UDP port (default 21105)
             timeout: Command timeout in seconds (default 2.0)
-
+            keep_alive: Start the 20-second keep-alive loop automatically
+                (default True).
         Returns:
             Connected Z21Station instance
         """
@@ -149,7 +155,8 @@ class Z21Station:
         station._protocol = protocol
         station._running = True
 
-        station._keep_alive_task = asyncio.create_task(station._keep_alive_loop())
+        if keep_alive:
+            station._keep_alive_task = asyncio.create_task(station._keep_alive_loop())
 
         await station._set_broadcast_flags(station._broadcast_flags)
 
@@ -166,6 +173,21 @@ class Z21Station:
                 break
             except Exception:
                 pass
+
+    def start_keep_alive(self) -> None:
+        """Start the keep-alive background task if not already running."""
+        if self._keep_alive_task is None or self._keep_alive_task.done():
+            self._keep_alive_task = asyncio.create_task(self._keep_alive_loop())
+
+    async def stop_keep_alive(self) -> None:
+        """Cancel the keep-alive background task if running."""
+        if self._keep_alive_task is not None:
+            self._keep_alive_task.cancel()
+            try:
+                await self._keep_alive_task
+            except asyncio.CancelledError:
+                pass
+            self._keep_alive_task = None
 
     async def _set_broadcast_flags(self, flags: int) -> None:
         """Set broadcast flags to control which events we receive."""
@@ -184,17 +206,20 @@ class Z21Station:
             try:
                 self._packet_waiters[header].put_nowait(packet)
             except asyncio.QueueFull:
-                log.warning(f"Queue is full on packet waiters header={get_header_name(header)}")
+                log.warning(
+                    "Queue is full on packet waiters header=%s", get_header_name(header)
+                )
                 self._packet_waiters[header] = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
                 self._packet_waiters[header].put_nowait(packet)
-
 
         if header in self._subscribers:
             for callback in self._subscribers[header]:
                 try:
                     callback(packet)
                 except Exception as e:
-                    log.error(f"Got callback error from subscribed header={get_header_name(header)} {e}")
+                    log.error(
+                        f"Got callback error from subscribed header={get_header_name(header)} {e}"
+                    )
 
     async def send_packet(self, packet: Packet) -> None:
         """

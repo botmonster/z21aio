@@ -343,6 +343,59 @@ class TestZ21Station:
 
         assert station._running is False
 
+    @pytest.mark.asyncio
+    async def test_start_keep_alive_starts_task(self, station):
+        """Test that start_keep_alive creates the background task."""
+        assert station._keep_alive_task is None
+
+        station.start_keep_alive()
+
+        assert station._keep_alive_task is not None
+        assert not station._keep_alive_task.done()
+
+        station._running = False
+        station._keep_alive_task.cancel()
+        try:
+            await station._keep_alive_task
+        except asyncio.CancelledError:
+            pass
+
+    @pytest.mark.asyncio
+    async def test_start_keep_alive_idempotent(self, station):
+        """Test that calling start_keep_alive twice does not create two tasks."""
+        station.start_keep_alive()
+        first_task = station._keep_alive_task
+
+        station.start_keep_alive()
+        second_task = station._keep_alive_task
+
+        assert first_task is second_task
+
+        station._running = False
+        first_task.cancel()
+        try:
+            await first_task
+        except asyncio.CancelledError:
+            pass
+
+    @pytest.mark.asyncio
+    async def test_stop_keep_alive_cancels_task(self, station):
+        """Test that stop_keep_alive cancels and clears the keep-alive task."""
+        station._keep_alive_task = asyncio.create_task(asyncio.sleep(100))
+
+        await station.stop_keep_alive()
+
+        assert station._keep_alive_task is None
+
+    @pytest.mark.asyncio
+    async def test_stop_keep_alive_no_op_when_not_running(self, station):
+        """Test that stop_keep_alive is safe when no task is running."""
+        assert station._keep_alive_task is None
+
+        await station.stop_keep_alive()
+
+        assert station._keep_alive_task is None
+
     def test_repr_disconnected(self):
         """Test repr when disconnected."""
         station = Z21Station()
@@ -364,8 +417,8 @@ class TestZ21StationConnect:
     """Integration tests for Z21Station.connect()."""
 
     @pytest.mark.asyncio
-    async def test_connect_creates_endpoint(self):
-        """Test that connect creates UDP endpoint."""
+    async def test_connect_creates_endpoint_with_keep_alive(self):
+        """Test that connect creates UDP endpoint and starts keep-alive by default."""
         with patch("asyncio.get_running_loop") as mock_loop:
             mock_transport = MagicMock()
             mock_protocol = MagicMock()
@@ -378,6 +431,7 @@ class TestZ21StationConnect:
             mock_loop.return_value.create_datagram_endpoint.assert_called_once()
             assert station._transport is mock_transport
             assert station._running is True
+            assert station._keep_alive_task is not None
 
             # Cleanup
             station._running = False
@@ -387,6 +441,26 @@ class TestZ21StationConnect:
                     await station._keep_alive_task
                 except asyncio.CancelledError:
                     pass
+
+    @pytest.mark.asyncio
+    async def test_connect_without_keep_alive(self):
+        """Test that connect skips keep-alive task when keep_alive=False."""
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_transport = MagicMock()
+            mock_protocol = MagicMock()
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(mock_transport, mock_protocol)
+            )
+
+            station = await Z21Station.connect("192.168.0.111", keep_alive=False)
+
+            mock_loop.return_value.create_datagram_endpoint.assert_called_once()
+            assert station._transport is mock_transport
+            assert station._running is True
+            assert station._keep_alive_task is None
+
+            # Cleanup - no task to cancel
+            station._running = False
 
 
 class TestZ21StationRailCom:
