@@ -151,6 +151,7 @@ class LocoState:
     is_busy: bool | None = None
     stepping: DccThrottleSteps | None = None
     speed_percentage: float | None = None
+    reverse: bool | None = None
     double_traction: bool | None = None
     smart_search: bool | None = None
     functions: list[bool] | None = None
@@ -188,12 +189,12 @@ class LocoState:
         if len(data) >= 4:
             # Byte 3: Speed and direction
             speed_byte = data[3]
-            direction = 1 if speed_byte & 0x80 else -1
+            state.reverse = not bool(speed_byte & 0x80)
             speed_value = speed_byte & 0x7F
 
             if state.stepping is not None:
                 max_speed = state.stepping.max_speed
-                state.speed_percentage = (speed_value / max_speed) * 100.0 * direction
+                state.speed_percentage = (speed_value / max_speed) * 100.0
 
         if len(data) >= 5:
             # Byte 4: Functions F0-F4, double traction, smart search

@@ -14,7 +14,8 @@ def on_any_loco_state(state: LocoState):
     """Called when any locomotive state changes."""
     print(f"Loco {state.address}: ", end="")
     if state.speed_percentage is not None:
-        print(f"speed={state.speed_percentage:+.1f}%", end=" ")
+        direction = "R" if state.reverse else "F"
+        print(f"speed={state.speed_percentage:.1f}%({direction})", end=" ")
     if state.functions:
         active = [f"F{i}" for i, on in enumerate(state.functions) if on]
         if active:

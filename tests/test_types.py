@@ -179,7 +179,8 @@ class TestLocoState:
         state = LocoState.from_bytes(data)
 
         assert state.speed_percentage is not None
-        assert state.speed_percentage > 0  # Forward
+        assert state.speed_percentage > 0
+        assert state.reverse is False
 
     def test_from_bytes_reverse_speed(self):
         """Test parsing with reverse speed."""
@@ -188,7 +189,19 @@ class TestLocoState:
         state = LocoState.from_bytes(data)
 
         assert state.speed_percentage is not None
-        assert state.speed_percentage < 0  # Reverse
+        assert state.speed_percentage > 0
+        assert state.reverse is True
+
+    def test_from_bytes_reverse_flag(self):
+        """Test reverse flag for both directions."""
+        forward_data = bytes([0x00, 0x03, 0x04, 0x80])  # Zero speed, forward
+        reverse_data = bytes([0x00, 0x03, 0x04, 0x00])  # Zero speed, reverse
+
+        forward_state = LocoState.from_bytes(forward_data)
+        reverse_state = LocoState.from_bytes(reverse_data)
+
+        assert forward_state.reverse is False
+        assert reverse_state.reverse is True
 
     def test_from_bytes_with_functions_f0_f4(self):
         """Test parsing with F0-F4 functions."""

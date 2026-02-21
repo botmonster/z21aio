@@ -15,11 +15,11 @@ logging.basicConfig(level=logging.INFO)
 def on_loco_state(state: LocoState):
     """Callback for locomotive state updates."""
     print(f"Address: {state.address}")
-    print(
-        f"Speed: {state.speed_percentage:.1f}%"
-        if state.speed_percentage
-        else "Speed: N/A"
-    )
+    if state.speed_percentage is not None:
+        direction = "reverse" if state.reverse else "forward"
+        print(f"Speed: {state.speed_percentage:.1f}% ({direction})")
+    else:
+        print("Speed: N/A")
     print(f"Busy: {state.is_busy}")
     if state.functions:
         active = [f"F{i}" for i, on in enumerate(state.functions) if on]
