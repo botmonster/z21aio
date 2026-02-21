@@ -25,7 +25,9 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def _calc_speed_byte(steps: DccThrottleSteps, speed_percent: float, reverse: bool = False) -> int:
+def _calc_speed_byte(
+    steps: DccThrottleSteps, speed_percent: float, reverse: bool = False
+) -> int:
     """
     Calculate speed byte from percentage and throttle steps.
 
@@ -37,7 +39,7 @@ def _calc_speed_byte(steps: DccThrottleSteps, speed_percent: float, reverse: boo
     Returns:
         Speed byte with direction bit (bit 7)
     """
-# Clamp speed to valid range
+    # Clamp speed to valid range
     speed_percent = max(0.0, min(100.0, speed_percent))
 
     # Map percentage to throttle steps
@@ -254,9 +256,8 @@ class Loco:
                     state = LocoState.from_bytes(xbus_msg.dbs)
                     if state.address == self._address:
                         callback(state)
-            except Exception as e:
-                log.error(f"Got exception handling packet in loco state callback {e}")
-                pass
+            except (ValueError, TypeError) as e:
+                log.error("Got exception handling packet in loco state callback %s", e)
 
         if XBUS_LOCO_INFO not in self._station._subscribers:
             self._station._subscribers[XBUS_LOCO_INFO] = []

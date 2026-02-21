@@ -66,7 +66,7 @@ class Z21Protocol(asyncio.DatagramProtocol):
                 )
                 self._station._handle_packet(packet)
                 offset += packet.data_len
-            except Exception as e:
+            except (ValueError, struct.error) as e:
                 log.error(
                     "Failed to parse packet from %s at offset %d: %s <%s>",
                     addr,
@@ -171,8 +171,8 @@ class Z21Station:
                     await self._set_broadcast_flags(self._broadcast_flags)
             except asyncio.CancelledError:
                 break
-            except Exception:
-                pass
+            except (OSError, ConnectionError) as e:
+                log.debug("Keep-alive failed: %s", e)
 
     def start_keep_alive(self) -> None:
         """Start the keep-alive background task if not already running."""
@@ -206,9 +206,7 @@ class Z21Station:
             try:
                 self._packet_waiters[header].put_nowait(packet)
             except asyncio.QueueFull:
-                log.warning(
-                    "Queue is full on packet waiters header=%s", get_header_name(header)
-                )
+                self._packet_waiters[header].shutdown(True)
                 self._packet_waiters[header] = asyncio.Queue(maxsize=QUEUE_MAX_SIZE)
                 self._packet_waiters[header].put_nowait(packet)
 
@@ -216,9 +214,11 @@ class Z21Station:
             for callback in self._subscribers[header]:
                 try:
                     callback(packet)
-                except Exception as e:
+                except (TypeError, ValueError) as e:
                     log.error(
-                        f"Got callback error from subscribed header={get_header_name(header)} {e}"
+                        "Got callback error from subscribed header=%s %s",
+                        get_header_name(header),
+                        e,
                     )
 
     async def send_packet(self, packet: Packet) -> None:
@@ -404,15 +404,15 @@ class Z21Station:
                     await asyncio.sleep(interval)
                 except asyncio.CancelledError:
                     break
-                except Exception:
-                    pass
+                except (OSError, ConnectionError) as e:
+                    log.debug("System state poll error: %s", e)
 
         def handle_state(packet: Packet) -> None:
             try:
                 state = SystemState.from_bytes(packet.data)
                 callback(state)
-            except Exception:
-                pass
+            except (ValueError, TypeError) as e:
+                log.debug("Invalid system state packet or callback error: %s", e)
 
         # Subscribe to state change packets
         if LAN_SYSTEMSTATE_DATACHANGED not in self._subscribers:
@@ -501,8 +501,8 @@ class Z21Station:
                 railcom_data = RailComData.from_bytes(packet.data)
                 if address is None or railcom_data.loco_address == address:
                     callback(railcom_data)
-            except Exception as e:
-                log.error(f"Error handling RailCom packet: {e}")
+            except (ValueError, TypeError) as e:
+                log.error("Error handling RailCom packet: %s", e)
 
         if LAN_RAILCOM_DATACHANGED not in self._subscribers:
             self._subscribers[LAN_RAILCOM_DATACHANGED] = []
@@ -541,8 +541,8 @@ class Z21Station:
                 except asyncio.TimeoutError:
                     # No response - may be no RailCom-capable decoder
                     await asyncio.sleep(interval)
-                except Exception as e:
-                    log.error(f"RailCom poll error: {e}")
+                except (OSError, ConnectionError) as e:
+                    log.error("RailCom poll error: %s", e)
                     await asyncio.sleep(interval)
 
         return asyncio.create_task(poll_loop())
@@ -576,8 +576,8 @@ class Z21Station:
                 if xbus_msg.x_header == XBUS_LOCO_INFO:
                     state = LocoState.from_bytes(xbus_msg.dbs)
                     callback(state)
-            except Exception as e:
-                log.error(f"Error in loco state subscription callback: {e}")
+            except (ValueError, TypeError) as e:
+                log.error("Error in loco state subscription callback: %s", e)
 
         # Register subscriber for XBUS_LOCO_INFO header
         if XBUS_LOCO_INFO not in self._subscribers:
@@ -602,8 +602,8 @@ class Z21Station:
 
         try:
             await self.logout()
-        except Exception as e:
-            log.warning(f"Error while logging out error={e}")
+        except (OSError, ConnectionError) as e:
+            log.warning("Error while logging out error=%s", e)
 
         if self._transport is not None:
             self._transport.close()
