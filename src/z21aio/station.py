@@ -28,6 +28,8 @@ from .messages import (
     LAN_RAILCOM_GETDATA,
     XBUS_GET_VERSION_REPLY,
     XBUS_GET_FIRMWARE_VERSION_REPLY,
+    XBUS_BC_TRACK_POWER,
+    XBUS_BC_TRACK_POWER_ON_DB0,
     BROADCAST_LOCO_INFO,
     BROADCAST_RAILCOM_SUBSCRIBED,
     BROADCAST_RAILCOM_ALL,
@@ -421,6 +423,37 @@ class Z21Station:
 
         # Start polling task
         return asyncio.create_task(poll_loop())
+
+    def subscribe_track_power(
+        self,
+        callback: Callable[[bool], None],
+    ) -> None:
+        """
+        Subscribe to track power state change broadcasts.
+
+        The callback is called whenever the track power state changes,
+        whether triggered by this client or an external device (e.g., multiMaus).
+
+        Requires broadcast flag 0x00000001, which is set by default.
+
+        Args:
+            callback: Called with True when track power turns on,
+                      False when it turns off.
+        """
+
+        def handle_packet(packet: Packet) -> None:
+            try:
+                msg = XBusMessage.from_bytes(packet.data)
+                if len(msg.dbs) < 1:
+                    return
+                is_on = msg.dbs[0] == XBUS_BC_TRACK_POWER_ON_DB0
+                callback(is_on)
+            except (ValueError, TypeError) as e:
+                log.error("Error in track power subscription callback: %s", e)
+
+        if XBUS_BC_TRACK_POWER not in self._subscribers:
+            self._subscribers[XBUS_BC_TRACK_POWER] = []
+        self._subscribers[XBUS_BC_TRACK_POWER].append(handle_packet)
 
     async def enable_railcom_broadcasts(self, all_locos: bool = False) -> None:
         """

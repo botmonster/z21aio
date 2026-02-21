@@ -16,6 +16,7 @@ from z21aio.messages import (
     BROADCAST_RAILCOM_ALL,
     XBUS_GET_VERSION_REPLY,
     XBUS_GET_FIRMWARE_VERSION_REPLY,
+    XBUS_BC_TRACK_POWER,
     XBUS_LOCO_INFO,
     XBusMessage,
 )
@@ -748,3 +749,93 @@ class TestZ21StationLocoStateSubscription:
 
         # Callback should not be called (wrong x_header)
         callback.assert_not_called()
+
+
+class TestZ21StationTrackPower:
+    """Tests for Z21Station track power subscription."""
+
+    @pytest.fixture
+    def station(self):
+        """Create a Z21Station instance without connecting."""
+        s = Z21Station()
+        s._transport = MagicMock()
+        s._running = True
+        return s
+
+    def test_subscribe_track_power_power_on(self, station):
+        """Test that a power-on broadcast calls callback with True."""
+        callback = MagicMock()
+        station.subscribe_track_power(callback)
+
+        # Power-on broadcast: x_header=0x61, DB0=0x01, xor=0x60
+        packet = Packet(header=LAN_XBUS_HEADER, data=b"\x61\x01\x60")
+        station._handle_packet(packet)
+
+        callback.assert_called_once_with(True)
+
+    def test_subscribe_track_power_power_off(self, station):
+        """Test that a power-off broadcast calls callback with False."""
+        callback = MagicMock()
+        station.subscribe_track_power(callback)
+
+        # Power-off broadcast: x_header=0x61, DB0=0x00, xor=0x61
+        packet = Packet(header=LAN_XBUS_HEADER, data=b"\x61\x00\x61")
+        station._handle_packet(packet)
+
+        callback.assert_called_once_with(False)
+
+    def test_subscribe_track_power_multiple_callbacks(self, station):
+        """Test that multiple callbacks each receive track power updates."""
+        callback1 = MagicMock()
+        callback2 = MagicMock()
+        station.subscribe_track_power(callback1)
+        station.subscribe_track_power(callback2)
+
+        packet = Packet(header=LAN_XBUS_HEADER, data=b"\x61\x01\x60")
+        station._handle_packet(packet)
+
+        callback1.assert_called_once_with(True)
+        callback2.assert_called_once_with(True)
+
+    def test_subscribe_track_power_external_device(self, station):
+        """Test that power state changes from external devices are received.
+
+        Z21 broadcasts the same packets regardless of whether the change was
+        triggered by this client or an external device (e.g., multiMaus).
+        """
+        received: list[bool] = []
+
+        def callback(is_on: bool) -> None:
+            received.append(is_on)
+
+        station.subscribe_track_power(callback)
+
+        # Simulate external device turning power on then off
+        station._handle_packet(Packet(header=LAN_XBUS_HEADER, data=b"\x61\x01\x60"))
+        station._handle_packet(Packet(header=LAN_XBUS_HEADER, data=b"\x61\x00\x61"))
+
+        assert received == [True, False]
+
+    @pytest.mark.asyncio
+    async def test_voltage_on_sends_correct_command(self, station):
+        """Test that voltage_on sends x_header=0x21, DB0=0x81."""
+        await station.voltage_on()
+
+        sent_data = station._transport.sendto.call_args[0][0]
+        assert b"\x21\x81" in sent_data
+
+    @pytest.mark.asyncio
+    async def test_voltage_off_sends_correct_command(self, station):
+        """Test that voltage_off sends x_header=0x21, DB0=0x80."""
+        await station.voltage_off()
+
+        sent_data = station._transport.sendto.call_args[0][0]
+        assert b"\x21\x80" in sent_data
+
+    def test_subscribe_track_power_registers_for_xbus_bc_track_power(self, station):
+        """Test that subscribe_track_power registers under XBUS_BC_TRACK_POWER key."""
+        callback = MagicMock()
+        station.subscribe_track_power(callback)
+
+        assert XBUS_BC_TRACK_POWER in station._subscribers
+        assert len(station._subscribers[XBUS_BC_TRACK_POWER]) == 1
