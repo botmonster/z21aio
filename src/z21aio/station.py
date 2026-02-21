@@ -8,34 +8,35 @@ Provides async methods for station control and locomotive operations.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 import logging
 import struct
-from collections.abc import Callable
-from typing import Any
+from typing import Any, Self
 
 from z21aio.headers import get_header_name
 
-from .packet import Packet
 from .messages import (
+    BROADCAST_LOCO_INFO,
+    BROADCAST_RAILCOM_ALL,
+    BROADCAST_RAILCOM_SUBSCRIBED,
     LAN_DISCOVER_DEVICES,
     LAN_GET_SERIAL_NUMBER,
     LAN_LOGOFF,
-    LAN_XBUS_HEADER,
+    LAN_RAILCOM_DATACHANGED,
+    LAN_RAILCOM_GETDATA,
     LAN_SET_BROADCASTFLAGS,
     LAN_SYSTEMSTATE_DATACHANGED,
     LAN_SYSTEMSTATE_GETDATA,
-    LAN_RAILCOM_DATACHANGED,
-    LAN_RAILCOM_GETDATA,
-    XBUS_GET_VERSION_REPLY,
-    XBUS_GET_FIRMWARE_VERSION_REPLY,
+    LAN_XBUS_HEADER,
     XBUS_BC_TRACK_POWER,
     XBUS_BC_TRACK_POWER_ON_DB0,
-    BROADCAST_LOCO_INFO,
-    BROADCAST_RAILCOM_SUBSCRIBED,
-    BROADCAST_RAILCOM_ALL,
+    XBUS_GET_FIRMWARE_VERSION_REPLY,
+    XBUS_GET_VERSION_REPLY,
+    XBUS_LOCO_INFO,
     XBusMessage,
 )
-from .types import SystemState, RailComData, LocoState
+from .packet import Packet
+from .types import LocoState, RailComData, SystemState
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +51,11 @@ class Z21Protocol(asyncio.DatagramProtocol):
     """UDP protocol handler for Z21 communication."""
 
     def __init__(self, station: Z21Station) -> None:
+        """Initialize the protocol handler.
+
+        Args:
+            station: The Z21Station instance that owns this protocol
+        """
         log.debug("Initializing Z21Protocol")
         self._station = station
         self._transport: asyncio.DatagramTransport | None = None
@@ -241,8 +247,7 @@ class Z21Station:
         header: int,
         timeout: float | None = None,
     ) -> Packet:
-        """
-        Wait for a packet with the specified header.
+        """Wait for a packet with the specified header.
 
         Args:
             header: Expected packet header
@@ -252,7 +257,8 @@ class Z21Station:
             Received packet
 
         Raises:
-            asyncio.TimeoutError: If no packet received within timeout
+            asynci
+            o.TimeoutError: If no packet received within timeout
         """
         if timeout is None:
             timeout = self._timeout
@@ -265,17 +271,14 @@ class Z21Station:
         try:
             return await asyncio.wait_for(queue.get(), timeout=timeout)
         except asyncio.TimeoutError:
-            raise asyncio.TimeoutError(
-                f"Timeout waiting for packet with header 0x{header:04X}"
-            )
+            raise TimeoutError(f"Timeout waiting for packet with header 0x{header:04X}")
 
     async def send_xbus_command(
         self,
         msg: XBusMessage,
         expected_response_header: int | None = None,
     ) -> XBusMessage | None:
-        """
-        Send an XBus command and optionally wait for response.
+        """Send an XBus command and optionally wait for response.
 
         Args:
             msg: XBus message to send
@@ -294,8 +297,7 @@ class Z21Station:
         return None
 
     async def get_serial_number(self) -> int:
-        """
-        Get the Z21 station serial number.
+        """Get the Z21 station serial number.
 
         Returns:
             Station serial number as integer
@@ -311,8 +313,7 @@ class Z21Station:
         return struct.unpack("<I", response.data[:4])[0]
 
     async def discover_devices(self) -> None:
-        """
-        Get the Z21 station devices.
+        """Get the Z21 station devices.
 
         Returns:
             None
@@ -321,8 +322,7 @@ class Z21Station:
         await self.send_packet(packet)
 
     async def get_firmware_version(self) -> tuple[int, int]:
-        """
-        Get the Z21 station firmware version.
+        """Get the Z21 station firmware version.
 
         Returns:
             Tuple of (major, minor) version in BCD format.
@@ -343,8 +343,7 @@ class Z21Station:
         return (v_msb, v_lsb)
 
     async def get_version(self) -> tuple[int, int]:
-        """
-        Get the X-BUS protocol version and command station ID.
+        """Get the X-BUS protocol version and command station ID.
 
         Returns:
             Tuple of (xbus_version, command_station_id).
@@ -385,8 +384,7 @@ class Z21Station:
         callback: Callable[[SystemState], None],
         freq_hz: float = 1.0,
     ) -> asyncio.Task[None]:
-        """
-        Subscribe to system state updates.
+        """Subscribe to system state updates.
 
         Args:
             callback: Function called with SystemState on each update
@@ -428,8 +426,7 @@ class Z21Station:
         self,
         callback: Callable[[bool], None],
     ) -> None:
-        """
-        Subscribe to track power state change broadcasts.
+        """Subscribe to track power state change broadcasts.
 
         The callback is called whenever the track power state changes,
         whether triggered by this client or an external device (e.g., multiMaus).
@@ -456,8 +453,7 @@ class Z21Station:
         self._subscribers[XBUS_BC_TRACK_POWER].append(handle_packet)
 
     async def enable_railcom_broadcasts(self, all_locos: bool = False) -> None:
-        """
-        Enable RailCom data broadcasts.
+        """Enable RailCom data broadcasts.
 
         Args:
             all_locos: If True, receive RailCom data for all locos.
@@ -482,8 +478,7 @@ class Z21Station:
         address: int | None = None,
         timeout: float | None = None,
     ) -> RailComData:
-        """
-        Request RailCom data for a specific locomotive or next in queue.
+        """Request RailCom data for a specific locomotive or next in queue.
 
         Args:
             address: DCC address to query, or None for circular polling
@@ -517,8 +512,7 @@ class Z21Station:
         callback: Callable[[RailComData], None],
         address: int | None = None,
     ) -> None:
-        """
-        Subscribe to RailCom data broadcasts.
+        """Subscribe to RailCom data broadcasts.
 
         Args:
             callback: Function called with RailComData on each update
@@ -547,8 +541,7 @@ class Z21Station:
         address: int | None = None,
         freq_hz: float = 1.0,
     ) -> asyncio.Task[None]:
-        """
-        Subscribe to RailCom data via polling.
+        """Subscribe to RailCom data via polling.
 
         Polls the Z21 at the specified frequency for RailCom data.
         Useful when broadcast flags cannot be changed or for specific addresses.
@@ -584,8 +577,7 @@ class Z21Station:
         self,
         callback: Callable[[LocoState], None],
     ) -> None:
-        """
-        Subscribe to locomotive state updates from all locomotives.
+        """Subscribe to locomotive state updates from all locomotives.
 
         The callback will be called whenever the station broadcasts
         a state update for any locomotive. The LocoState object
@@ -601,7 +593,6 @@ class Z21Station:
 
             station.subscribe_loco_state(on_any_loco_state)
         """
-        from .messages import XBUS_LOCO_INFO
 
         def handle_packet(packet: Packet) -> None:
             try:
@@ -618,8 +609,7 @@ class Z21Station:
         self._subscribers[XBUS_LOCO_INFO].append(handle_packet)
 
     async def close(self) -> None:
-        """
-        Close the connection and clean up resources.
+        """Close the connection and clean up resources.
 
         Stops keep-alive task, sends logout, and closes transport.
         """
@@ -631,7 +621,7 @@ class Z21Station:
             try:
                 await self._keep_alive_task
             except asyncio.CancelledError as e:
-                log.warning(f"Error while canceling keep alive task error={e}")
+                log.warning("Error while canceling keep alive task error=%s", e)
 
         try:
             await self.logout()
@@ -642,7 +632,8 @@ class Z21Station:
             self._transport.close()
             self._transport = None
 
-    async def __aenter__(self) -> Z21Station:
+    async def __aenter__(self) -> Self:
+        """Return the station instance for async context managers."""
         return self
 
     async def __aexit__(
@@ -651,8 +642,10 @@ class Z21Station:
         exc_val: BaseException | None,
         exc_tb: Any,
     ) -> None:
+        """Close the station when leaving an async context."""
         await self.close()
 
     def __repr__(self) -> str:
+        """Return a string representation of the station."""
         status = "connected" if self._running else "disconnected"
         return f"Z21Station({self._host}:{self._port}, {status})"

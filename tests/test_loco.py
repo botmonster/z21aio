@@ -194,7 +194,7 @@ class TestLoco:
         call_args = mock_station.send_xbus_command.call_args
         msg = call_args[0][0]
 
-        assert msg.dbs[3] == 0x00  # Stop
+        assert msg.dbs[3] == 0x80  # Stop with forward direction bit
 
     @pytest.mark.asyncio
     async def test_estop(self, mock_station):
@@ -206,7 +206,27 @@ class TestLoco:
         call_args = mock_station.send_xbus_command.call_args
         msg = call_args[0][0]
 
-        assert msg.dbs[3] == 0x01  # Emergency stop (E-Stop)
+        assert msg.dbs[3] == 0x81  # E-stop with forward direction bit
+
+    @pytest.mark.asyncio
+    async def test_stop_reverse(self, mock_station):
+        """Test normal stop in reverse direction."""
+        loco = Loco(mock_station, address=3)
+        await loco.stop(reverse=True)
+
+        mock_station.send_xbus_command.assert_called_once()
+        msg = mock_station.send_xbus_command.call_args[0][0]
+        assert msg.dbs[3] == 0x00  # Stop, no direction bit = reverse
+
+    @pytest.mark.asyncio
+    async def test_estop_reverse(self, mock_station):
+        """Test emergency stop in reverse direction."""
+        loco = Loco(mock_station, address=3)
+        await loco.estop(reverse=True)
+
+        mock_station.send_xbus_command.assert_called_once()
+        msg = mock_station.send_xbus_command.call_args[0][0]
+        assert msg.dbs[3] == 0x01  # E-stop, no direction bit = reverse
 
     @pytest.mark.asyncio
     async def test_function_on(self, mock_station):

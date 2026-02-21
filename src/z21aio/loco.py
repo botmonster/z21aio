@@ -1,22 +1,18 @@
-"""
-Locomotive control.
+"""Locomotive control.
 
 Provides the Loco class for controlling DCC locomotives via Z21.
 """
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
 from z21aio.packet import Packet
 
-from .messages import (
-    XBUS_LOCO_INFO,
-    XBusMessage,
-)
+from .messages import XBUS_LOCO_INFO, XBusMessage
 from .types import DccThrottleSteps, FunctionAction, LocoState, RailComData
 
 if TYPE_CHECKING:
@@ -28,8 +24,7 @@ log = logging.getLogger(__name__)
 def _calc_speed_byte(
     steps: DccThrottleSteps, speed_percent: float, reverse: bool = False
 ) -> int:
-    """
-    Calculate speed byte from percentage and throttle steps.
+    """Calculate speed byte from percentage and throttle steps.
 
     Args:
         steps: Throttle step mode
@@ -49,16 +44,18 @@ def _calc_speed_byte(
     # Clamp to valid range (0-127 for step values)
     speed_value = min(speed_value, 127)
 
-    # Combine with direction bit
+    return _combine_speed_direction(speed_value, reverse)
+
+
+def _combine_speed_direction(speed_value: int, reverse: bool) -> int:
+    """Combine speed value with direction bit."""
     if reverse:
         return speed_value
-    else:
-        return speed_value | 0x80
+    return speed_value | 0x80
 
 
 class Loco:
-    """
-    Locomotive controller.
+    """Locomotive controller.
 
     Provides methods for controlling a single DCC locomotive including
     speed, direction, and function control.
@@ -78,8 +75,7 @@ class Loco:
         address: int,
         steps: DccThrottleSteps = DccThrottleSteps.STEPS_128,
     ) -> None:
-        """
-        Initialize locomotive controller.
+        """Initialize locomotive controller.
 
         Use Loco.control() class method for proper initialization.
 
@@ -100,8 +96,7 @@ class Loco:
         address: int,
         steps: DccThrottleSteps = DccThrottleSteps.STEPS_128,
     ) -> Loco:
-        """
-        Get control of a locomotive.
+        """Get control of a locomotive.
 
         Args:
             station: Z21Station instance
@@ -114,11 +109,9 @@ class Loco:
         loco = cls(station, address, steps)
 
         # Request initial state to "register" with the station
-        try:
+        # It's OK if we don't get a response - loco may not be on track
+        with contextlib.suppress(TimeoutError):
             await loco.get_state()
-        except asyncio.TimeoutError:
-            # It's OK if we don't get a response - loco may not be on track
-            pass
 
         return loco
 
@@ -133,8 +126,7 @@ class Loco:
         return self._steps
 
     async def drive(self, speed_percent: float, reverse: bool = False) -> None:
-        """
-        Set locomotive speed and direction.
+        """Set locomotive speed and direction.
 
         Args:
             speed_percent: Speed as percentage (0 to 100)
@@ -144,27 +136,26 @@ class Loco:
         msg = XBusMessage.loco_drive(self._address, self._steps, speed_byte)
         await self._station.send_xbus_command(msg)
 
-    async def stop(self) -> None:
-        """
-        Normal stop with braking curve.
+    async def stop(self, reverse: bool = False) -> None:
+        """Normal stop with braking curve.
 
         The locomotive will decelerate according to its decoder settings.
         """
-        msg = XBusMessage.loco_drive(self._address, self._steps, 0x00)
+        speed_byte = _combine_speed_direction(0x00, reverse)
+        msg = XBusMessage.loco_drive(self._address, self._steps, speed_byte)
         await self._station.send_xbus_command(msg)
 
-    async def estop(self) -> None:
-        """
-        Emergency stop (immediate halt).
+    async def estop(self, reverse: bool = False) -> None:
+        """Emergency stop (immediate halt).
 
         The locomotive will stop immediately without deceleration.
         """
-        msg = XBusMessage.loco_drive(self._address, self._steps, 0x01)
+        speed_byte = _combine_speed_direction(0x01, reverse)
+        msg = XBusMessage.loco_drive(self._address, self._steps, speed_byte)
         await self._station.send_xbus_command(msg)
 
     async def set_function(self, index: int, action: FunctionAction) -> None:
-        """
-        Set a locomotive function.
+        """Set a locomotive function.
 
         Args:
             index: Function number (0-31)
@@ -180,8 +171,7 @@ class Loco:
         await self._station.send_xbus_command(msg)
 
     async def function_on(self, index: int) -> None:
-        """
-        Turn on a locomotive function.
+        """Turn on a locomotive function.
 
         Args:
             index: Function number (0-31)
@@ -189,8 +179,7 @@ class Loco:
         await self.set_function(index, FunctionAction.ON)
 
     async def function_off(self, index: int) -> None:
-        """
-        Turn off a locomotive function.
+        """Turn off a locomotive function.
 
         Args:
             index: Function number (0-31)
@@ -198,8 +187,7 @@ class Loco:
         await self.set_function(index, FunctionAction.OFF)
 
     async def function_toggle(self, index: int) -> None:
-        """
-        Toggle a locomotive function.
+        """Toggle a locomotive function.
 
         Args:
             index: Function number (0-31)
@@ -207,8 +195,7 @@ class Loco:
         await self.set_function(index, FunctionAction.TOGGLE)
 
     async def set_headlights(self, on: bool) -> None:
-        """
-        Turn headlights on or off (F0).
+        """Turn headlights on or off (F0).
 
         Args:
             on: True to turn on, False to turn off
@@ -217,8 +204,7 @@ class Loco:
         await self.set_function(0, action)
 
     async def get_state(self) -> LocoState:
-        """
-        Get current locomotive state.
+        """Get current locomotive state.
 
         Returns:
             LocoState with current speed, direction, and function states
@@ -232,7 +218,7 @@ class Loco:
             raise RuntimeError("No response received")
 
         state = LocoState.from_bytes(response.dbs)
-        log.debug(f"Got loco state {state}")
+        log.debug("Got loco state %s", state)
 
         return state
 
@@ -240,8 +226,7 @@ class Loco:
         self,
         callback: Callable[[LocoState], None],
     ) -> None:
-        """
-        Subscribe to locomotive state updates.
+        """Subscribe to locomotive state updates.
 
         The callback will be called whenever the station broadcasts
         an update for this locomotive's address.
@@ -266,8 +251,7 @@ class Loco:
 
     @property
     def railcom(self) -> RailComData | None:
-        """
-        Current RailCom data for this locomotive.
+        """Current RailCom data for this locomotive.
 
         Returns None if no RailCom subscription is active or no data received.
         Subscribe with subscribe_railcom() to receive updates.
@@ -275,8 +259,7 @@ class Loco:
         return self._railcom
 
     async def get_railcom_data(self, timeout: float | None = None) -> RailComData:
-        """
-        Request RailCom data for this locomotive.
+        """Request RailCom data for this locomotive.
 
         Args:
             timeout: Response timeout in seconds (uses station default if None)
@@ -296,8 +279,7 @@ class Loco:
         self,
         callback: Callable[[RailComData], None] | None = None,
     ) -> None:
-        """
-        Subscribe to RailCom data updates for this locomotive.
+        """Subscribe to RailCom data updates for this locomotive.
 
         Updates the railcom property and optionally calls a callback.
 
