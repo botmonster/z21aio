@@ -10,6 +10,8 @@ from z21aio.messages import (
     XBUS_LOCO_GET_INFO,
     XBUS_GET_VERSION,
     XBUS_GET_FIRMWARE_VERSION,
+    XBUS_TURNOUT_INFO,
+    XBUS_SET_TURNOUT,
 )
 from z21aio.types import DccThrottleSteps, FunctionAction
 
@@ -196,6 +198,76 @@ class TestXBusMessage:
             assert (msg.dbs[3] & 0x3F) == i
             # Action ON = 01 in upper 2 bits
             assert (msg.dbs[3] & 0xC0) == 0x40
+
+    def test_get_turnout_info(self):
+        """Test get turnout info command for address 0."""
+        msg = XBusMessage.get_turnout_info(0)
+
+        assert msg.x_header == XBUS_TURNOUT_INFO
+        assert msg.dbs[0] == 0x00  # MSB
+        assert msg.dbs[1] == 0x00  # LSB
+
+    def test_get_turnout_info_high_address(self):
+        """Test get turnout info command for address > 255."""
+        msg = XBusMessage.get_turnout_info(500)
+
+        assert msg.x_header == XBUS_TURNOUT_INFO
+        # Address 500 = 0x01F4
+        assert msg.dbs[0] == 0x01  # MSB
+        assert msg.dbs[1] == 0xF4  # LSB
+
+    def test_set_turnout_activate_p0_queue(self):
+        """Test set turnout: activate output 0, queue mode."""
+        msg = XBusMessage.set_turnout(0, output=0, activate=True, queue_mode=True)
+
+        assert msg.x_header == XBUS_SET_TURNOUT
+        # DB2: 1_1_0_1_0_0_0 = 0xA8
+        assert msg.dbs[2] == 0xA8
+
+    def test_set_turnout_activate_p1_queue(self):
+        """Test set turnout: activate output 1, queue mode."""
+        msg = XBusMessage.set_turnout(0, output=1, activate=True, queue_mode=True)
+
+        assert msg.x_header == XBUS_SET_TURNOUT
+        # DB2: 1_1_0_1_0_0_1 = 0xA9
+        assert msg.dbs[2] == 0xA9
+
+    def test_set_turnout_deactivate_p0_queue(self):
+        """Test set turnout: deactivate output 0, queue mode."""
+        msg = XBusMessage.set_turnout(0, output=0, activate=False, queue_mode=True)
+
+        assert msg.x_header == XBUS_SET_TURNOUT
+        # DB2: 1_1_0_0_0_0_0 = 0xA0
+        assert msg.dbs[2] == 0xA0
+
+    def test_set_turnout_activate_p0_immediate(self):
+        """Test set turnout: activate output 0, immediate mode."""
+        msg = XBusMessage.set_turnout(0, output=0, activate=True, queue_mode=False)
+
+        assert msg.x_header == XBUS_SET_TURNOUT
+        # DB2: 1_0_0_1_0_0_0 = 0x88
+        assert msg.dbs[2] == 0x88
+
+    def test_set_turnout_deactivate_p1_immediate(self):
+        """Test set turnout: deactivate output 1, immediate mode."""
+        msg = XBusMessage.set_turnout(0, output=1, activate=False, queue_mode=False)
+
+        assert msg.x_header == XBUS_SET_TURNOUT
+        # DB2: 1_0_0_0_0_0_1 = 0x81
+        assert msg.dbs[2] == 0x81
+
+    def test_set_turnout_address_encoding(self):
+        """Test set turnout address encoding."""
+        msg = XBusMessage.set_turnout(500, output=0, activate=True)
+
+        # Address 500 = 0x01F4
+        assert msg.dbs[0] == 0x01  # MSB
+        assert msg.dbs[1] == 0xF4  # LSB
+
+    def test_set_turnout_invalid_output(self):
+        """Test that invalid output raises ValueError."""
+        with pytest.raises(ValueError, match="0 or 1"):
+            XBusMessage.set_turnout(0, output=2, activate=True)
 
     def test_repr(self):
         """Test string representation."""

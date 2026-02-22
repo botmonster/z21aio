@@ -32,6 +32,8 @@ XBUS_BC_TRACK_POWER_ON_DB0 = 0x01   # DB0 value in power-on broadcast (2.8)
 XBUS_LOCO_GET_INFO = 0xE3
 XBUS_LOCO_DRIVE = 0xE4
 XBUS_LOCO_INFO = 0xEF
+XBUS_TURNOUT_INFO = 0x43
+XBUS_SET_TURNOUT = 0x53
 XBUS_GET_FIRMWARE_VERSION = 0xF1
 XBUS_GET_FIRMWARE_VERSION_REPLY = 0xF3
 
@@ -215,6 +217,59 @@ class XBusMessage:
             x_header=XBUS_LOCO_DRIVE,
             dbs=bytes([0xF8, addr_msb, addr_lsb, function_byte]),
         )
+
+    @classmethod
+    def get_turnout_info(cls, address: int) -> "XBusMessage":
+        """Create command to request turnout state.
+
+        Args:
+            address: Turnout function address (0-2047)
+
+        Returns:
+            XBusMessage for getting turnout info
+        """
+        addr_msb = (address >> 8) & 0xFF
+        addr_lsb = address & 0xFF
+        return cls(x_header=XBUS_TURNOUT_INFO, dbs=bytes([addr_msb, addr_lsb]))
+
+    @classmethod
+    def set_turnout(
+        cls,
+        address: int,
+        output: int,
+        activate: bool,
+        queue_mode: bool = True,
+    ) -> "XBusMessage":
+        """Create command to switch a turnout output.
+
+        Args:
+            address: Turnout function address (0-2047)
+            output: Output number (0 or 1)
+            activate: True to activate, False to deactivate
+            queue_mode: True for queue mode (Z21 handles timing),
+                       False for immediate (client handles timing)
+
+        Returns:
+            XBusMessage for switching turnout
+
+        Raises:
+            ValueError: If output is not 0 or 1
+        """
+        if output not in (0, 1):
+            raise ValueError(f"Output must be 0 or 1, got {output}")
+
+        addr_msb = (address >> 8) & 0xFF
+        addr_lsb = address & 0xFF
+
+        # DB2 byte format: 1_Q_0_A_0_0_P
+        db2 = 0x80  # bit 7 always 1
+        if queue_mode:
+            db2 |= 0x20  # bit 5 = Q
+        if activate:
+            db2 |= 0x08  # bit 3 = A
+        db2 |= output & 0x01  # bit 0 = P
+
+        return cls(x_header=XBUS_SET_TURNOUT, dbs=bytes([addr_msb, addr_lsb, db2]))
 
     def __repr__(self) -> str:
         return (

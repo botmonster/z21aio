@@ -33,10 +33,11 @@ from .messages import (
     XBUS_GET_FIRMWARE_VERSION_REPLY,
     XBUS_GET_VERSION_REPLY,
     XBUS_LOCO_INFO,
+    XBUS_TURNOUT_INFO,
     XBusMessage,
 )
 from .packet import Packet
-from .types import LocoState, RailComData, SystemState
+from .types import LocoState, RailComData, SystemState, TurnoutState
 
 log = logging.getLogger(__name__)
 
@@ -607,6 +608,42 @@ class Z21Station:
         if XBUS_LOCO_INFO not in self._subscribers:
             self._subscribers[XBUS_LOCO_INFO] = []
         self._subscribers[XBUS_LOCO_INFO].append(handle_packet)
+
+    def subscribe_turnout_state(
+        self,
+        callback: Callable[[TurnoutState], None],
+    ) -> None:
+        """Subscribe to turnout state updates from all turnouts.
+
+        The callback will be called whenever the station broadcasts
+        a state update for any turnout.
+
+        Args:
+            callback: Function called with TurnoutState for each update.
+                     Receives updates for ALL turnouts.
+
+        Example:
+            def on_any_turnout_state(state: TurnoutState):
+                print(f"Turnout {state.address}: position={state.position.name}")
+
+            station.subscribe_turnout_state(on_any_turnout_state)
+        """
+
+        def handle_packet(packet: Packet) -> None:
+            try:
+                xbus_msg = XBusMessage.from_bytes(packet.data)
+                if (
+                    xbus_msg.x_header == XBUS_TURNOUT_INFO
+                    and len(xbus_msg.dbs) == 3
+                ):
+                    state = TurnoutState.from_bytes(xbus_msg.dbs)
+                    callback(state)
+            except (ValueError, TypeError) as e:
+                log.error("Error in turnout state subscription callback: %s", e)
+
+        if XBUS_TURNOUT_INFO not in self._subscribers:
+            self._subscribers[XBUS_TURNOUT_INFO] = []
+        self._subscribers[XBUS_TURNOUT_INFO].append(handle_packet)
 
     async def close(self) -> None:
         """Close the connection and clean up resources.

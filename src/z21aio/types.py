@@ -59,6 +59,42 @@ class FunctionAction(IntEnum):
     TOGGLE = 2
 
 
+class TurnoutPosition(IntEnum):
+    """Turnout position from LAN_X_TURNOUT_INFO ZZ bits."""
+
+    UNKNOWN = 0  # ZZ=00: not switched yet
+    P0 = 1  # ZZ=01: position P=0 (output 1)
+    P1 = 2  # ZZ=10: position P=1 (output 2)
+    INVALID = 3  # ZZ=11: invalid
+
+
+@dataclass
+class TurnoutState:
+    """Turnout state from LAN_X_TURNOUT_INFO."""
+
+    address: int
+    position: TurnoutPosition
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "TurnoutState":
+        """Parse from 3 XBus DB bytes (FAdr_MSB, FAdr_LSB, status).
+
+        Args:
+            data: 3 bytes of turnout state data
+
+        Returns:
+            TurnoutState instance
+
+        Raises:
+            ValueError: If data length is not 3 bytes
+        """
+        if len(data) != 3:
+            raise ValueError(f"TurnoutState requires 3 bytes, got {len(data)}")
+        address = (data[0] << 8) | data[1]
+        position = TurnoutPosition(data[2] & 0x03)
+        return cls(address=address, position=position)
+
+
 @dataclass
 class SystemState:
     """
