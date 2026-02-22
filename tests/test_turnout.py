@@ -88,6 +88,42 @@ class TestTurnout:
 
         assert turnout.address == 5
 
+    @pytest.mark.asyncio
+    async def test_control_returns_turnout(self, mock_station):
+        """Test that control() returns a Turnout with the correct address."""
+        response_msg = XBusMessage(
+            x_header=XBUS_TURNOUT_INFO,
+            dbs=bytes([0x00, 0x07, 0x01]),  # Address 7, P0
+        )
+        mock_station.send_xbus_command.return_value = response_msg
+
+        turnout = await Turnout.control(mock_station, address=7)
+
+        assert isinstance(turnout, Turnout)
+        assert turnout.address == 7
+
+    @pytest.mark.asyncio
+    async def test_control_requests_initial_state(self, mock_station):
+        """Test that control() fetches initial state to register with station."""
+        response_msg = XBusMessage(
+            x_header=XBUS_TURNOUT_INFO,
+            dbs=bytes([0x00, 0x03, 0x02]),  # Address 3, P1
+        )
+        mock_station.send_xbus_command.return_value = response_msg
+
+        await Turnout.control(mock_station, address=3)
+
+        mock_station.send_xbus_command.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_control_suppresses_timeout(self, mock_station):
+        """Test that control() succeeds even if the initial get_state times out."""
+        mock_station.send_xbus_command.side_effect = TimeoutError
+
+        turnout = await Turnout.control(mock_station, address=10)
+
+        assert turnout.address == 10
+
     def test_repr(self, mock_station):
         """Test string representation."""
         turnout = Turnout(mock_station, address=42)

@@ -632,10 +632,7 @@ class Z21Station:
         def handle_packet(packet: Packet) -> None:
             try:
                 xbus_msg = XBusMessage.from_bytes(packet.data)
-                if (
-                    xbus_msg.x_header == XBUS_TURNOUT_INFO
-                    and len(xbus_msg.dbs) == 3
-                ):
+                if xbus_msg.x_header == XBUS_TURNOUT_INFO and len(xbus_msg.dbs) == 3:
                     state = TurnoutState.from_bytes(xbus_msg.dbs)
                     callback(state)
             except (ValueError, TypeError) as e:

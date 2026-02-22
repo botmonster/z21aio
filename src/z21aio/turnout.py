@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -31,7 +32,7 @@ class Turnout:
     switching outputs and subscribing to state updates.
 
     Example:
-        turnout = Turnout(station, address=0)
+        turnout = await Turnout.control(station, address=0)
         await turnout.switch(TurnoutPosition.P0)
         await turnout.switch(TurnoutPosition.P1)
     """
@@ -45,6 +46,30 @@ class Turnout:
         """
         self._station = station
         self._address = address
+
+    @classmethod
+    async def control(
+        cls,
+        station: Z21Station,
+        address: int,
+    ) -> Turnout:
+        """Get control of a turnout.
+
+        Args:
+            station: Z21Station instance
+            address: Turnout function address (0-2047)
+
+        Returns:
+            Turnout instance ready for control
+        """
+        turnout = cls(station, address)
+
+        # Request initial state to "register" with the station
+        # It's OK if we don't get a response - turnout may not be reachable
+        with contextlib.suppress(TimeoutError):
+            await turnout.get_state()
+
+        return turnout
 
     @property
     def address(self) -> int:
