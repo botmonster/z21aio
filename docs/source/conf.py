@@ -1,6 +1,7 @@
 # Configuration file for the Sphinx documentation builder.
 
 import sys
+from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 
 # Add src directory to path so autodoc can find modules
@@ -11,7 +12,13 @@ sys.path.insert(0, str(src_path))
 project = "z21aio"
 copyright = "2026, botmonster"
 author = "botmonster"
-release = "1.0.6"
+
+try:
+    release = version("z21aio")
+except PackageNotFoundError:
+    release = "unknown"
+
+version = ".".join(release.split(".")[:2])
 
 # Sphinx extensions
 extensions = [
