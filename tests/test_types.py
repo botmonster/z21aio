@@ -203,6 +203,57 @@ class TestLocoState:
         assert forward_state.reverse is False
         assert reverse_state.reverse is True
 
+    def test_estop_forward(self):
+        """Test emergency stop detection with forward direction."""
+        # 0x81 = speed_value 1 with forward direction bit (0x80)
+        data = bytes([0x00, 0x03, 0x04, 0x81])
+
+        state = LocoState.from_bytes(data)
+
+        assert state.speed_value == 1
+        assert state.is_estop is True
+        assert state.reverse is False
+
+    def test_estop_reverse(self):
+        """Test emergency stop detection with reverse direction."""
+        # 0x01 = speed_value 1 with no direction bit (reverse)
+        data = bytes([0x00, 0x03, 0x04, 0x01])
+
+        state = LocoState.from_bytes(data)
+
+        assert state.speed_value == 1
+        assert state.is_estop is True
+        assert state.reverse is True
+
+    def test_not_estop_normal_stop(self):
+        """Test that normal stop (speed_value 0) is not estop."""
+        # 0x80 = speed_value 0 with forward direction bit
+        data = bytes([0x00, 0x03, 0x04, 0x80])
+
+        state = LocoState.from_bytes(data)
+
+        assert state.speed_value == 0
+        assert state.is_estop is False
+
+    def test_not_estop_normal_speed(self):
+        """Test that regular running speeds are not estop."""
+        # 0xC0 = speed_value 64 with forward direction bit
+        data = bytes([0x00, 0x03, 0x04, 0xC0])
+
+        state = LocoState.from_bytes(data)
+
+        assert state.speed_value == 64
+        assert state.is_estop is False
+
+    def test_speed_value_none_without_speed_byte(self):
+        """Test that speed_value is None when no speed byte is present."""
+        data = bytes([0x00, 0x03, 0x04])  # Address + stepping only
+
+        state = LocoState.from_bytes(data)
+
+        assert state.speed_value is None
+        assert state.is_estop is False
+
     def test_from_bytes_with_functions_f0_f4(self):
         """Test parsing with F0-F4 functions."""
         # F0 is bit 4, F1-F4 are bits 0-3

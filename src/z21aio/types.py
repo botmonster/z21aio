@@ -187,10 +187,20 @@ class LocoState:
     is_busy: bool | None = None
     stepping: DccThrottleSteps | None = None
     speed_percentage: float | None = None
+    speed_value: int | None = None
     reverse: bool | None = None
     double_traction: bool | None = None
     smart_search: bool | None = None
     functions: list[bool] | None = None
+
+    @property
+    def is_estop(self) -> bool:
+        """Return True if this state represents an emergency stop.
+
+        In the Z21 protocol, emergency stop is encoded as speed value 1,
+        regardless of throttle step mode.
+        """
+        return self.speed_value == 1
 
     @classmethod
     def from_bytes(cls, data: bytes) -> "LocoState":
@@ -227,6 +237,7 @@ class LocoState:
             speed_byte = data[3]
             state.reverse = not bool(speed_byte & 0x80)
             speed_value = speed_byte & 0x7F
+            state.speed_value = speed_value
 
             if state.stepping is not None:
                 max_speed = state.stepping.max_speed
